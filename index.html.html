@@ -1,0 +1,268 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Send, User, Scissors, Calendar, MessageSquare, ChevronRight, RefreshCcw } from 'lucide-react';
+
+const BarberChatbot = () => {
+  const [messages, setMessages] = useState([
+    {
+      id: 1,
+      sender: 'bot',
+      text: '¡Hola! Bienvenido a Barbería Classic ✂️. Soy tu asistente virtual. Puedo ayudarte a elegir tu próximo estilo, darte recomendaciones según tu tipo de cabello o agendar una cita. ¿En qué te puedo ayudar hoy?',
+      options: ['Agendar Cita', 'Recomendación de Corte', 'Ver Estilos', 'Ayuda General']
+    }
+  ]);
+  const [inputText, setInputText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  
+  // Estado conversacional del bot
+  const [botState, setBotState] = useState('idle'); 
+  const [bookingData, setBookingData] = useState({ service: '', time: '', name: '' });
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isTyping]);
+
+  const addMessage = (text, sender, options = []) => {
+    setMessages(prev => [...prev, { id: Date.now(), text, sender, options }]);
+  };
+
+  const handleSend = (text) => {
+    const messageText = text || inputText;
+    if (!messageText.trim()) return;
+
+    // Agregar mensaje del usuario
+    addMessage(messageText, 'user');
+    setInputText('');
+    setIsTyping(true);
+
+    // Procesar respuesta del bot con un ligero retraso para simular que está escribiendo
+    setTimeout(() => {
+      processBotResponse(messageText);
+      setIsTyping(false);
+    }, 1000);
+  };
+
+  const processBotResponse = (userInput) => {
+    const text = userInput.toLowerCase();
+
+    // 1. Manejar flujo de agendamiento de citas
+    if (botState === 'booking_service') {
+      setBookingData({ ...bookingData, service: userInput });
+      setBotState('booking_time');
+      addMessage(`¡Perfecto! Has elegido ${userInput}. ¿Para qué día y hora te gustaría venir? (Ej: Mañana a las 4pm)`);
+      return;
+    }
+    
+    if (botState === 'booking_time') {
+      setBookingData({ ...bookingData, time: userInput });
+      setBotState('booking_name');
+      addMessage('¡Anotado! Por último, ¿cuál es tu nombre para registrar la cita?');
+      return;
+    }
+
+    if (botState === 'booking_name') {
+      setBotState('idle');
+      addMessage(`¡Listo, ${userInput}! 🎉 Tu cita para "${bookingData.service}" ha sido agendada para: ${bookingData.time}. ¡Te esperamos en la barbería con una bebida de cortesía!`, 'bot', ['Agendar otra cita', 'Recomendación de Corte', 'Menú Principal']);
+      setBookingData({ service: '', time: '', name: '' });
+      return;
+    }
+
+    // 2. Manejar flujo de recomendaciones por tipo de cabello
+    if (botState === 'asking_hair_type') {
+      setBotState('idle');
+      if (text.includes('lacio') || text.includes('liso')) {
+        addMessage('El cabello lacio es súper versátil. Te recomiendo un **Pompadour** si te gusta el volumen arriba, o un **Crop Texturizado** con un Mid Fade si buscas algo más moderno y fácil de peinar. ¿Quieres saber sobre algún estilo en particular?', 'bot', ['Saber del Fade', 'Saber del Mullet', 'Menú Principal']);
+      } else if (text.includes('ondulado') || text.includes('ondas')) {
+        addMessage('¡Las ondas tienen un estilo increíble! Un **Mullet** moderno queda espectacular con cabello ondulado. También un **Taper Fade** dejando tus ondas sueltas en la parte superior te dará un look muy relajado pero limpio.', 'bot', ['Saber del Mullet', 'Saber del Fade', 'Agendar Cita']);
+      } else if (text.includes('rizado') || text.includes('churo')) {
+        addMessage('Para el cabello rizado, mi opinión es que resaltes esa textura. Un **High Top Fade** clásico siempre funciona. Si quieres menos mantenimiento, un degradado bajo (Low Fade) con los rizos definidos arriba es el corte ideal.', 'bot', ['Agendar Cita', 'Menú Principal']);
+      } else if (text.includes('afro')) {
+        addMessage('¡El cabello afro tiene mucha personalidad! Te recomiendo un **Buzz Cut** (rapado) con un perfilado bien marcado (line up) para un look súper limpio. O si prefieres volumen, un **Sponge Curl** con un Fade a los lados se ve fenomenal.', 'bot', ['Saber del Buzz Cut', 'Agendar Cita', 'Menú Principal']);
+      } else {
+        addMessage('No estoy seguro de qué tipo de cabello es ese 🤔. Pero si no estás seguro, te recomiendo un **Taper Fade** clásico, le queda bien a la mayoría. ¡O puedes agendar y nuestro barbero te asesorará en persona!', 'bot', ['Agendar Cita', 'Menú Principal']);
+      }
+      return;
+    }
+
+    // 3. Manejar palabras clave y opciones principales
+    if (text.includes('agendar') || text.includes('cita') || text.includes('reservar')) {
+      setBotState('booking_service');
+      addMessage('¡Excelente decisión! Vamos a agendar tu cita. ¿Qué servicio te gustaría hacerte hoy?', 'bot', ['Corte de cabello', 'Corte + Barba', 'Solo Barba', 'Corte + Cejas']);
+      return;
+    }
+
+    if (text.includes('recomendación') || text.includes('recomendar') || text.includes('recomiendas') || text.includes('no se que hacerme')) {
+      setBotState('asking_hair_type');
+      addMessage('Me encanta ayudar con eso. Para darte la mejor recomendación y mi opinión profesional, cuéntame: ¿Cómo es tu tipo de cabello?', 'bot', ['Es Lacio', 'Es Ondulado', 'Es Rizado', 'Es Afro']);
+      return;
+    }
+
+    if (text.includes('estilos') || text.includes('cortes')) {
+      addMessage('Tenemos muchos estilos en tendencia. Pregúntame específicamente por alguno, o elige uno de estos:', 'bot', ['Fade (Degradado)', 'Mullet', 'Buzz Cut', 'Pompadour']);
+      return;
+    }
+
+    // 4. Manejar estilos específicos
+    if (text.includes('fade') || text.includes('degradado')) {
+      addMessage('El **Fade (o degradado)** es nuestro corte estrella 🔥. Consiste en llevar el cabello muy corto (o al ras) en los laterales y la nuca, aumentando gradualmente hacia arriba. Hay 3 tipos principales: Low (bajo), Mid (medio) y High (alto). Es súper limpio y hace que tu rostro resalte. ¿Te animas por un Fade?', 'bot', ['Agendar Cita', 'Ver otros estilos']);
+      return;
+    }
+
+    if (text.includes('mullet')) {
+      addMessage('El **Mullet** es el corte de la rebeldía moderna 🎸. Es más corto a los lados y al frente, pero se deja largo en la parte posterior (la nuca). Ahora se usa con un toque moderno, combinándolo con un degradado en los lados (Mullet Fade). Es ideal si quieres un estilo audaz y diferente.', 'bot', ['Agendar Cita', 'Recomendación de Corte']);
+      return;
+    }
+
+    if (text.includes('buzz') || text.includes('rapado')) {
+      addMessage('El **Buzz Cut** es el rapado militar por excelencia 🪒. Es un corte muy parejo hecho con máquina en toda la cabeza. Mi opinión: es perfecto para quienes buscan cero mantenimiento, comodidad total y tienen facciones faciales fuertes. ¡Te levantas y ya estás peinado!', 'bot', ['Agendar Cita', 'Menú Principal']);
+      return;
+    }
+
+    if (text.includes('pompadour') || text.includes('quiff')) {
+      addMessage('El **Pompadour** o **Quiff** son cortes clásicos y elegantes 🎩. Consisten en tener volumen en la parte frontal (el copete) peinado hacia atrás o hacia arriba. Requieren algo de peinado diario con cera o pomada, pero te dan un look de mucha clase y presencia.', 'bot', ['Agendar Cita', 'Menú Principal']);
+      return;
+    }
+
+    if (text.includes('ayuda') || text.includes('menú principal') || text.includes('hola') || text.includes('buenos dias')) {
+      setBotState('idle');
+      addMessage('Aquí estoy para ayudarte. Puedes elegir una de las siguientes opciones:', 'bot', ['Agendar Cita', 'Recomendación de Corte', 'Ver Estilos']);
+      return;
+    }
+
+    // Fallback si no entiende
+    addMessage('No estoy seguro de haber entendido eso. 😅 Recuerda que soy un bot en entrenamiento. ¿Quieres agendar una cita o que te recomiende un corte?', 'bot', ['Agendar Cita', 'Recomendación de Corte', 'Ver Estilos']);
+  };
+
+  return (
+    <div className="flex justify-center items-center min-h-screen bg-neutral-900 p-4 font-sans text-neutral-100">
+      <div className="w-full max-w-md bg-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[85vh] sm:h-[700px] border border-neutral-700">
+        
+        {/* Header */}
+        <div className="bg-gradient-to-r from-amber-600 to-amber-500 p-4 flex items-center shadow-md z-10">
+          <div className="bg-neutral-900 p-2 rounded-full mr-3">
+            <Scissors className="w-6 h-6 text-amber-500" />
+          </div>
+          <div>
+            <h1 className="font-bold text-lg text-white">BarberBot 🧔🏻‍♂️</h1>
+            <p className="text-amber-100 text-xs flex items-center">
+              <span className="w-2 h-2 rounded-full bg-green-400 mr-1 animate-pulse"></span>
+              En línea y listo para ayudarte
+            </p>
+          </div>
+          <button 
+            onClick={() => {
+              setMessages([{
+                id: 1, sender: 'bot', text: 'Conversación reiniciada. ¿En qué te puedo ayudar?',
+                options: ['Agendar Cita', 'Recomendación de Corte']
+              }]);
+              setBotState('idle');
+            }}
+            className="ml-auto p-2 hover:bg-amber-700 rounded-full transition-colors"
+            title="Reiniciar chat"
+          >
+            <RefreshCcw className="w-5 h-5 text-white" />
+          </button>
+        </div>
+
+        {/* Chat Area */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-neutral-900 custom-scrollbar">
+          {messages.map((msg) => (
+            <div key={msg.id} className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
+              
+              <div className={`flex items-end max-w-[85%] ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                {/* Avatar */}
+                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${msg.sender === 'user' ? 'bg-amber-500 ml-2' : 'bg-neutral-700 mr-2 border border-neutral-600'}`}>
+                  {msg.sender === 'user' ? <User className="w-5 h-5 text-white" /> : <Scissors className="w-4 h-4 text-amber-500" />}
+                </div>
+
+                {/* Bubble */}
+                <div className={`p-3 rounded-2xl text-sm ${msg.sender === 'user' ? 'bg-amber-500 text-neutral-900 rounded-br-none font-medium' : 'bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-bl-none leading-relaxed'}`}>
+                  {/* Parse bold text for bot messages */}
+                  {msg.sender === 'bot' ? (
+                    <span dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-amber-400">$1</strong>') }} />
+                  ) : (
+                    msg.text
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Options */}
+              {msg.options && msg.options.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2 ml-10">
+                  {msg.options.map((opt, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleSend(opt)}
+                      disabled={isTyping || messages.indexOf(msg) !== messages.length - 1}
+                      className="text-xs bg-neutral-800 border border-amber-600 text-amber-500 hover:bg-amber-600 hover:text-neutral-900 transition-colors px-3 py-1.5 rounded-full flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {opt} <ChevronRight className="w-3 h-3 ml-1" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Typing Indicator */}
+          {isTyping && (
+            <div className="flex items-start">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-neutral-700 mr-2 flex items-center justify-center border border-neutral-600">
+                <Scissors className="w-4 h-4 text-amber-500" />
+              </div>
+              <div className="bg-neutral-800 border border-neutral-700 p-4 rounded-2xl rounded-bl-none flex space-x-1 w-16 justify-center">
+                <div className="w-2 h-2 bg-amber-500 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                <div className="w-2 h-2 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input Area */}
+        <div className="p-3 bg-neutral-800 border-t border-neutral-700">
+          <form 
+            onSubmit={(e) => { e.preventDefault(); handleSend(); }}
+            className="flex items-center bg-neutral-900 rounded-full border border-neutral-600 overflow-hidden pr-1 focus-within:border-amber-500 transition-colors"
+          >
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="Escribe tu mensaje aquí..."
+              className="flex-1 bg-transparent border-none px-4 py-3 text-sm text-neutral-200 focus:outline-none focus:ring-0 placeholder-neutral-500"
+            />
+            <button
+              type="submit"
+              disabled={!inputText.trim() || isTyping}
+              className="bg-amber-500 text-neutral-900 p-2 rounded-full hover:bg-amber-400 disabled:opacity-50 disabled:bg-neutral-700 disabled:text-neutral-500 transition-colors mr-1"
+            >
+              <Send className="w-5 h-5 ml-0.5" />
+            </button>
+          </form>
+        </div>
+      </div>
+      
+      {/* Estilos adicionales globales para scrollbars */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background-color: #525252;
+          border-radius: 20px;
+        }
+      `}} />
+    </div>
+  );
+};
+
+export default BarberChatbot;
